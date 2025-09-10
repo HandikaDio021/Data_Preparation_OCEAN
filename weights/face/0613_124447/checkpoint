@@ -1,0 +1,2 @@
+model_checkpoint_path: "face.t5"
+all_model_checkpoint_paths: "face.t5"

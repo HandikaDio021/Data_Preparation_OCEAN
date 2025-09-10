@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Deteksi Kepribadian</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f8f0ff;
+      padding: 30px;
+      color: #3a2a4d;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: #fff0ff;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 0 15px rgba(155, 89, 182, 0.2);
+    }
+    h1 {
+      text-align: center;
+      color: #8e44ad;
+    }
+    h2 {
+      color: #7d3c98;
+    }
+    .columns {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    .left-column, .right-column {
+      flex: 1;
+      min-width: 300px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    input[type="text"], input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-top: 5px;
+    }
+    button, input[type="submit"] {
+      margin: 5px 5px 10px 0;
+      padding: 10px 20px;
+      background-color: #9b59b6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover, input[type="submit"]:hover {
+      background-color: #884ea0;
+    }
+    video {
+      margin-top: 10px;
+      width: 100%;
+      border-radius: 12px;
+      background: #000;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+      background: #fdf7ff;
+      border: 1px solid #d2b4de;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #d2b4de;
+      text-align: left;
+    }
+    th {
+      background-color: #e8daef;
+      color: #4a235a;
+    }
+    .high { color: #6c3483; font-weight: bold; }
+    .low { color: #b03a2e; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Deteksi Kepribadian dari Video Wajah</h1>
+
+    <div class="columns">
+      <!-- Kolom Kiri -->
+      <div class="left-column">
+        <form id="form" method="post" enctype="multipart/form-data">
+          <div class="form-group">
+            <label>Nama Pengguna:</label>
+            <input type="text" name="username" required />
+          </div>
+
+          <div class="form-group">
+            <label>Unggah Video:</label>
+            <input type="file" name="video" accept="video/*" id="videoInput">
+          </div>
+
+          <div class="form-group">
+            <label>Atau Rekam Video:</label><br>
+            <button type="button" id="startBtn">Mulai Rekam</button>
+            <button type="button" id="stopBtn" disabled>Stop & Pratinjau</button>
+
+            <video id="liveVideo" autoplay muted></video>
+            <video id="previewVideo" controls style="display:none;"></video>
+          </div>
+
+          <input type="submit" value="Analisis Video" />
+        </form>
+      </div>
+
+      <!-- Kolom Kanan -->
+      <div class="right-column">
+  {% if prediction %}
+    <h2>Hasil Kepribadian (OCEAN)</h2>
+    <table id="resultTable">
+      <tr>
+        <th>Trait</th>
+        <th>Skor (%)</th>
+        <th>Kategori</th>
+        <th>Keterangan</th>
+      </tr>
+      {% for key, value in prediction.items() %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>{{ value }}%</td>
+          <td>
+            {% if value >= 50 %}
+              <span class="high">High</span>
+            {% else %}
+              <span class="low">Low</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if key == 'Openness' %}
+              {% if value >= 50 %}
+                Terbuka terhadap ide baru, kreatif, imajinatif
+              {% else %}
+                Lebih konvensional, realistis, tidak suka perubahan
+              {% endif %}
+            {% elif key == 'Conscientiousness' %}
+              {% if value >= 50 %}
+                Disiplin, terorganisir, bertanggung jawab
+              {% else %}
+                Kurang teratur, ceroboh, impulsif
+              {% endif %}
+            {% elif key == 'Extraversion' %}
+              {% if value >= 50 %}
+                Ramah, percaya diri, suka bersosialisasi
+              {% else %}
+                Pendiam, tertutup, lebih menikmati waktu sendiri
+              {% endif %}
+            {% elif key == 'Agreeableness' %}
+              {% if value >= 50 %}
+                Penuh empati, mudah bekerja sama, perhatian
+              {% else %}
+                Kompetitif, skeptis, kurang kooperatif
+              {% endif %}
+            {% elif key == 'Neuroticism' %}
+              {% if value >= 50 %}
+                Emosional, mudah cemas atau stres
+              {% else %}
+                Tenang, stabil secara emosional, tahan tekanan
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </table>
+     <div style="margin-top: 15px;">
+  {% if csv_path %}
+    <a href="{{ csv_path }}" download>
+      <button>Download CSV</button>
+    </a>
+  {% endif %}
+  {% if pdf_path %}
+    <a href="{{ pdf_path }}" download>
+      <button>Download PDF</button>
+    </a>
+  {% endif %}
+</div>
+  {% endif %}
+</div>
+
+ <!-- Script Rekam Video -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  const liveVideo = document.getElementById('liveVideo');
+  const previewVideo = document.getElementById('previewVideo');
+  const videoInput = document.getElementById('videoInput');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+
+  let mediaRecorder;
+  let recordedBlobs = [];
+
+  navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    .then(stream => {
+      liveVideo.srcObject = stream;
+      window.stream = stream;
+    });
+
+  startBtn.onclick = () => {
+    recordedBlobs = [];
+    mediaRecorder = new MediaRecorder(window.stream, { mimeType: 'video/webm;codecs=vp9' });
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) recordedBlobs.push(e.data);
+    };
+
+    mediaRecorder.start();
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+  };
+
+  stopBtn.onclick = () => {
+    mediaRecorder.stop();
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedBlobs, { type: 'video/webm' });
+      previewVideo.src = URL.createObjectURL(blob);
+      previewVideo.style.display = 'block';
+
+      const videoFile = new File([blob], "rekaman.webm", { type: "video/webm" });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(videoFile);
+      videoInput.files = dataTransfer.files;
+    };
+  };
+
+  // === Download CSV ===
+  function downloadCSV() {
+    const table = document.getElementById("resultTable");
+    let csv = [];
+    for (let row of table.rows) {
+      let cols = Array.from(row.cells).map(cell => cell.innerText);
+      csv.push(cols.join(","));
+    }
+    const blob = new Blob([csv.join("\n")], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "hasil_kepribadian.csv";
+    link.click();
+  }
+
+  // === Download PDF ===
+  async function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text("Hasil Kepribadian (OCEAN)", 14, 16);
+
+    const table = document.getElementById("resultTable");
+    let y = 28;
+
+    for (let i = 0; i < table.rows.length; i++) {
+      const cells = table.rows[i].cells;
+      let rowText = Array.from(cells).map(cell => cell.innerText).join(" | ");
+      doc.text(rowText, 14, y);
+      y += 10;
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+
+    doc.save("hasil_kepribadian.pdf");
+  }
+</script>
+
+</body>
+</html>
